@@ -143,6 +143,20 @@
   @keyframes sp{to{transform:rotate(360deg)}}
   .status.err{color:var(--rb-rischio-fg);background:var(--rb-rischio-bg);border-radius:12px;padding:16px;line-height:1.5}
   .status.err b{color:inherit}
+  /* import modal */
+  .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.96);z-index:60;width:min(92vw,420px);max-height:80vh;overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:18px;opacity:0;pointer-events:none;transition:opacity .2s, transform .2s}
+  .modal.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+  #impov{z-index:55}
+  .mhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .mtitle{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600}
+  .mclose{width:32px;height:32px;border:1px solid var(--line);background:transparent;border-radius:9px;color:var(--ink);font-size:15px;cursor:pointer}
+  .grow{border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px;cursor:pointer;transition:border-color .15s}
+  .grow:active,.grow:hover{border-color:var(--accent)}
+  .grow .gn{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px}
+  .grow .gd{font-size:12.5px;color:var(--muted);margin-top:3px;font-family:'Space Mono',monospace}
+  .grow .gp{font-size:12px;color:var(--accent);font-weight:600;margin-top:4px}
+  .imperr{color:var(--rb-rischio-fg);background:var(--rb-rischio-bg);border-radius:10px;padding:14px;font-size:13px;line-height:1.5}
+  .impmuted{color:var(--muted);font-size:13px;text-align:center;padding:18px}
 </style>
 </head>
 <body>
@@ -159,7 +173,7 @@
   </div>
 
   <div class="sec">Ricerca</div>
-  <button class="importbtn" onclick="alert('Import da Swap Planner: prossimo passo.')">&#8595; Importa un gruppo da Swap Planner</button>
+  <button class="importbtn" onclick="openImport()">&#8595; Importa un gruppo da Swap Planner</button>
   <div class="field"><label>Partenza</label><input id="f-from" list="aplist" value="Bari (BRI)" autocapitalize="characters"></div>
   <div class="field"><label>Arrivo</label><input id="f-to" list="aplist" value="Madrid (MAD)" autocapitalize="characters"></div>
   <datalist id="aplist"></datalist>
@@ -174,6 +188,12 @@
   <div class="field"><label>Quante persone</label><input id="f-pax" type="number" inputmode="numeric" value="4"></div>
   <button class="cerca" id="cercaBtn" onclick="doSearch()">Cerca combinazioni</button>
 </aside>
+
+<div class="overlay" id="impov" onclick="closeImport()"></div>
+<div class="modal" id="impModal" aria-hidden="true">
+  <div class="mhead"><div class="mtitle">Gruppi da Swap Planner</div><button class="mclose" onclick="closeImport()" aria-label="Chiudi">&#10005;</button></div>
+  <div id="impBody"></div>
+</div>
 
 <div class="wrap">
   <header>
@@ -227,6 +247,55 @@ var SAMPLE = {
 
 var RESULTS={and:[],rit:[]};
 var dir="and", saved={};
+
+// ---- import da Swap Planner (Supabase condiviso) ----
+var SB_URL="https://sdksosnjtzkdgolntfrp.supabase.co";
+var SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNka3Nvc25qdHprZGdvbG50ZnJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMDU3MzQsImV4cCI6MjA5Njc4MTczNH0.BT-cI3Obd5TeBa5xN5ckrsC5xIm1MtMphXQABTiWVc8";
+var IMPORT_ROWS=[], IMPORT_EVENT="";
+
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function showImportModal(html){
+  document.getElementById("impBody").innerHTML=html;
+  document.getElementById("impModal").classList.add("open");
+  document.getElementById("impov").classList.add("open");
+}
+function closeImport(){
+  document.getElementById("impModal").classList.remove("open");
+  document.getElementById("impov").classList.remove("open");
+}
+function paxCount(p){ return String(p||"").split(",").filter(function(x){return x.trim();}).length; }
+
+async function openImport(){
+  showImportModal('<div class="status"><div class="spin"></div>Carico i gruppi da Swap Planner...</div>');
+  try{
+    var url=SB_URL+"/rest/v1/swap_events?select=id,name,start_day,end_day,participants,deleted&deleted=eq.false&order=start_day.asc";
+    var r=await fetch(url,{headers:{apikey:SB_KEY,Authorization:"Bearer "+SB_KEY}});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    IMPORT_ROWS=await r.json();
+    if(!IMPORT_ROWS || !IMPORT_ROWS.length){ showImportModal('<div class="impmuted">Nessun gruppo attivo su Swap Planner.</div>'); return; }
+    var html="";
+    for(var i=0;i<IMPORT_ROWS.length;i++){
+      var g=IMPORT_ROWS[i], n=paxCount(g.participants);
+      html+='<div class="grow" onclick="pickGroup('+i+')"><div class="gn">'+esc(g.name||"Gruppo")+'</div>'
+        +'<div class="gd">'+fmtDate(g.start_day)+' &#8594; '+fmtDate(g.end_day)+'</div>'
+        +'<div class="gp">'+n+' '+(n===1?"persona":"persone")+'</div></div>';
+    }
+    showImportModal(html);
+  }catch(e){
+    showImportModal('<div class="imperr"><b>Non riesco a leggere i gruppi.</b><br>'+esc(String(e.message||e))+'</div>');
+  }
+}
+function pickGroup(i){
+  var g=IMPORT_ROWS[i]; if(!g) return;
+  var n=paxCount(g.participants);
+  if(g.start_day) document.getElementById("f-d1").value=g.start_day;
+  if(g.end_day) document.getElementById("f-d2").value=g.end_day;
+  if(n) document.getElementById("f-pax").value=n;
+  IMPORT_EVENT=g.name||"";
+  var sw=document.getElementById("tSwap");
+  sw.style.display=""; sw.innerHTML="&#8595; DA SWAP PLANNER: "+esc(IMPORT_EVENT);
+  closeImport();
+}
 
 function openMenu(){document.getElementById("drawer").classList.add("open");document.getElementById("ov").classList.add("open");}
 function closeMenu(){document.getElementById("drawer").classList.remove("open");document.getElementById("ov").classList.remove("open");}
@@ -352,7 +421,7 @@ async function runSearch(silent){
   closeMenu();
   document.getElementById("demoBanner").style.display="none";
   document.getElementById("tDest").textContent=document.getElementById("f-to").value.replace(/\s*\([A-Z]{3}\)\s*/,"");
-  document.getElementById("tMeta").innerHTML="<b>"+(pax||"?")+" persone</b> &#183; andata "+fmtDate(d1)+" &#183; ritorno "+fmtDate(d2);
+  document.getElementById("tMeta").innerHTML=(IMPORT_EVENT?esc(IMPORT_EVENT)+" &#183; ":"")+"<b>"+(pax||"?")+" persone</b> &#183; andata "+fmtDate(d1)+" &#183; ritorno "+fmtDate(d2);
   document.getElementById("subAnd").textContent=from+" \u2192 "+to;
   document.getElementById("subRit").textContent=to+" \u2192 "+from;
   RESULTS={and:[],rit:[]};
