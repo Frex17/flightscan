@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>FlightScan — prototipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F2F6FA; --surface:#FFFFFF; --ink:#14202E; --muted:#5E6B7A; --line:#E2E8EF;
+    --accent:#138C8C; --accent-soft:#DCEFEF;
+    --rb-ok-bg:#E3F4EC; --rb-ok-fg:#1E7A52;
+    --rb-teso-bg:#FBEFD8; --rb-teso-fg:#8A5611;
+    --rb-rischio-bg:#FBE6E3; --rb-rischio-fg:#C0463C;
+    --shadow:0 1px 2px rgba(20,32,46,.05), 0 10px 26px rgba(20,32,46,.08);
+    --bar:#14202E;
+  }
+  [data-theme="dark"]{
+    --bg:#0F1722; --surface:#1A2532; --ink:#EAF0F6; --muted:#A6B3C2; --line:#2E3C4B;
+    --accent:#46D3D3; --accent-soft:#103838;
+    --rb-ok-bg:#15392A; --rb-ok-fg:#4FD295;
+    --rb-teso-bg:#3A2D12; --rb-teso-fg:#F0B84A;
+    --rb-rischio-bg:#3E211E; --rb-rischio-fg:#F0796E;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 26px rgba(0,0,0,.4);
+    --bar:#46D3D3;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;line-height:1.45;
+    padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 32px);font-variant-numeric:tabular-nums;
+    transition:background .25s, color .25s;}
+  .wrap{max-width:520px;margin:0 auto;padding:0 18px}
+
+  header{padding:18px 0 10px;display:flex;align-items:center;gap:12px}
+  .burger{width:40px;height:40px;border:1px solid var(--line);background:var(--surface);border-radius:11px;
+    font-size:17px;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .brand{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:25px;flex:1}
+  .brand b{color:var(--accent);font-weight:700}
+  .tripcount{font-size:12px;font-weight:600;color:var(--accent);border:1px solid var(--accent-soft);border-radius:20px;padding:5px 11px;background:var(--surface)}
+
+  .demo{background:var(--accent-soft);color:var(--accent);border-radius:10px;font-size:12px;padding:8px 12px;margin:0 0 14px;text-align:center;line-height:1.4}
+
+  .trip{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:15px 16px;margin-bottom:14px}
+  .trip .dest{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600}
+  .trip .meta{font-size:13px;color:var(--muted);margin-top:2px}
+  .trip .meta b{color:var(--ink);font-weight:600}
+  .fromswap{font-size:11px;color:var(--accent);font-weight:600;letter-spacing:.3px;margin-top:9px}
+
+  .tabs{display:flex;gap:8px;margin:16px 0 6px}
+  .tab{flex:1;text-align:center;padding:10px;border-radius:11px;border:1px solid var(--line);background:var(--surface);
+    font-family:inherit;font-weight:600;font-size:14px;color:var(--muted);cursor:pointer}
+  .tab .sub{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-top:1px}
+  .tab.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .tab.on .sub{color:var(--bg);opacity:.7}
+
+  .resbar{display:flex;align-items:center;justify-content:space-between;margin:14px 0 14px}
+  .resbar .n{font-size:13px;color:var(--muted)}
+  .sort select{border:none;background:transparent;font-family:inherit;font-size:13px;font-weight:600;color:var(--ink)}
+
+  /* boarding pass */
+  .pass{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:15px;
+    box-shadow:var(--shadow);margin-bottom:18px;opacity:0;transform:translateY(8px);animation:rise .4s ease forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.pass{animation:none;opacity:1;transform:none}}
+
+  .ribbon{display:flex;align-items:center;gap:8px;padding:9px 15px;font-size:12.5px;font-weight:600;border-radius:14px 14px 0 0}
+  .ribbon.ok{background:var(--rb-ok-bg);color:var(--rb-ok-fg)}
+  .ribbon.teso{background:var(--rb-teso-bg);color:var(--rb-teso-fg)}
+  .ribbon.rischio{background:var(--rb-rischio-bg);color:var(--rb-rischio-fg)}
+  .ribbon .mut{font-weight:500;opacity:.85}
+  .ribbon .fr{margin-left:auto;font-weight:700;letter-spacing:1px;font-size:11px;opacity:.7}
+
+  .body{display:flex;position:relative}
+  .main{flex:1;padding:15px 15px 14px;min-width:0}
+  .stub{width:104px;flex-shrink:0;border-left:2px dashed var(--line);padding:14px 10px;
+    display:flex;flex-direction:column;align-items:center;justify-content:space-between;text-align:center;gap:10px}
+  /* perforation notches */
+  .notch{position:absolute;width:14px;height:14px;border-radius:50%;background:var(--bg);
+    border:1px solid var(--line);right:104px;z-index:2}
+  .notch.t{top:0;transform:translate(50%,-50%)}
+  .notch.b{bottom:0;transform:translate(50%,50%)}
+
+  .legrow{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px}
+  .ep{min-width:0}
+  .ep .code{font-size:26px;font-weight:700;letter-spacing:.5px;line-height:1}
+  .ep .city{font-size:11px;color:var(--muted);font-weight:500;margin-top:2px;white-space:nowrap}
+  .ep .tm{font-size:15px;font-weight:600;margin-top:4px}
+  .ep.r{text-align:right}
+  .mid{text-align:center}
+  .mid .fn{font-size:10.5px;color:var(--muted);margin-bottom:4px;letter-spacing:.3px}
+  .mid .track{position:relative;height:2px;background:var(--line);border-radius:2px}
+  .mid .track::after{content:"";position:absolute;right:0;top:50%;width:5px;height:5px;border-radius:50%;background:var(--accent);transform:translate(0,-50%)}
+  .mid .plane{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--surface);padding:0 6px;color:var(--accent);font-size:12px;line-height:1}
+
+  /* connection = two smaller legs */
+  .pass.conn .ep .code{font-size:19px}
+  .pass.conn .ep .tm{font-size:13px;margin-top:2px}
+  .layover{display:flex;align-items:center;gap:8px;margin:10px 0;padding:6px 11px;background:var(--bg);border-radius:9px;font-size:12px;color:var(--muted);font-weight:600}
+  .layover .base{color:var(--rb-ok-fg);font-weight:700;margin-left:auto;font-size:11px}
+  .footline{font-size:11px;color:var(--muted);margin-top:11px}
+
+  .stub .lbl{font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--ink);text-transform:uppercase}
+  .stub .via{font-size:10.5px;color:var(--muted);margin-top:1px}
+  .stub .dur{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:var(--ink)}
+  .stub .durlbl{font-size:9px;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;margin-bottom:-4px}
+  .barcode{width:100%;height:34px;background-image:repeating-linear-gradient(90deg,var(--bar) 0 2px,transparent 2px 4px,var(--bar) 4px 5px,transparent 5px 8px);opacity:.55;border-radius:2px}
+
+  .save{display:block;width:100%;margin-top:12px;border:1px solid var(--accent);background:transparent;color:var(--accent);
+    font-family:inherit;font-weight:600;font-size:13px;border-radius:10px;padding:10px;cursor:pointer}
+  .save.saved{background:var(--accent);color:var(--surface)}
+  [data-theme="dark"] .save.saved{color:var(--bg)}
+
+  /* drawer */
+  .overlay{position:fixed;inset:0;background:rgba(20,19,16,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:40}
+  .overlay.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;left:0;bottom:0;width:min(88vw,350px);background:var(--surface);z-index:50;
+    transform:translateX(-100%);transition:transform .28s ease;box-shadow:var(--shadow);overflow-y:auto;
+    padding:22px 20px calc(env(safe-area-inset-bottom) + 26px)}
+  .drawer.open{transform:none}
+  .dtitle{font-family:'Space Grotesk',sans-serif;font-size:23px;font-weight:600;margin-bottom:4px}
+  .dclose{position:absolute;top:18px;right:18px;width:34px;height:34px;border:1px solid var(--line);background:transparent;border-radius:9px;color:var(--ink);font-size:16px;cursor:pointer}
+  .sec{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:700;margin:22px 0 10px}
+  .seg{display:flex;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:4px}
+  .seg button{flex:1;border:none;background:transparent;font-family:inherit;font-weight:600;font-size:13.5px;color:var(--muted);padding:8px;border-radius:8px;cursor:pointer}
+  .seg button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+  .field{margin-top:12px}
+  .field label{display:block;font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;font-weight:600}
+  .field input{width:100%;border:none;border-bottom:1.5px solid var(--line);background:transparent;font-family:inherit;font-size:16px;color:var(--ink);padding:6px 0}
+  .field input:focus{outline:none;border-color:var(--accent)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .importbtn{width:100%;margin-top:10px;border:1px dashed var(--accent);background:transparent;color:var(--accent);font-family:inherit;font-weight:600;font-size:13px;border-radius:10px;padding:11px;cursor:pointer}
+  .cerca{width:100%;margin-top:20px;border:none;background:var(--accent);color:#fff;font-family:inherit;font-weight:700;font-size:15px;border-radius:11px;padding:13px;cursor:pointer;letter-spacing:.3px}
+  /* departure-board mono for ticket data */
+  .ep .code{font-family:'Space Mono',monospace;font-weight:700}
+  .ep .tm{font-family:'Space Mono',monospace;font-weight:400}
+  .mid .fn{font-family:'Space Mono',monospace}
+  .stub .dur{font-family:'Space Mono',monospace;font-weight:700}
+  .tripcount,.footline{font-family:'Space Mono',monospace}
+  .status{padding:26px 6px;text-align:center;color:var(--muted);font-size:13.5px}
+  .status .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;margin:0 auto 12px;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .status.err{color:var(--rb-rischio-fg);background:var(--rb-rischio-bg);border-radius:12px;padding:16px;line-height:1.5}
+  .status.err b{color:inherit}
+</style>
+</head>
+<body>
+
+<div class="overlay" id="ov" onclick="closeMenu()"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <button class="dclose" onclick="closeMenu()" aria-label="Chiudi">&#10005;</button>
+  <div class="dtitle">Impostazioni</div>
+
+  <div class="sec">Tema</div>
+  <div class="seg">
+    <button id="th-light" class="on" onclick="setTheme('light')">Chiaro</button>
+    <button id="th-dark" onclick="setTheme('dark')">Scuro</button>
+  </div>
+
+  <div class="sec">Ricerca</div>
+  <button class="importbtn" onclick="alert('Import da Swap Planner: prossimo passo.')">&#8595; Importa un gruppo da Swap Planner</button>
+  <div class="field"><label>Partenza</label><input id="f-from" list="aplist" value="Bari (BRI)" autocapitalize="characters"></div>
+  <div class="field"><label>Arrivo</label><input id="f-to" list="aplist" value="Madrid (MAD)" autocapitalize="characters"></div>
+  <datalist id="aplist"></datalist>
+  <div class="row2">
+    <div class="field"><label>Andata</label><input id="f-d1" type="date" value="2026-08-08"></div>
+    <div class="field"><label>Ritorno</label><input id="f-d2" type="date" value="2026-08-12"></div>
+  </div>
+  <div class="row2">
+    <div class="field"><label>Scalo min (h)</label><input id="f-min" type="number" inputmode="decimal" value="1"></div>
+    <div class="field"><label>Scalo max (h)</label><input id="f-max" type="number" inputmode="decimal" value="3"></div>
+  </div>
+  <div class="field"><label>Quante persone</label><input id="f-pax" type="number" inputmode="numeric" value="4"></div>
+  <button class="cerca" id="cercaBtn" onclick="doSearch()">Cerca combinazioni</button>
+</aside>
+
+<div class="wrap">
+  <header>
+    <button class="burger" onclick="openMenu()" aria-label="Menu">&#9776;</button>
+    <div class="brand">Flight<b>Scan</b></div>
+    <div class="tripcount" id="cnt">0 salvati</div>
+  </header>
+
+  <div class="demo" id="demoBanner">Anteprima · dati di esempio. Apri il menu e premi <b>Cerca</b> per gli orari reali (richiede il deploy su Vercel).</div>
+
+  <div class="trip">
+    <div class="dest" id="tDest">Madrid</div>
+    <div class="meta" id="tMeta"><b>4 persone</b> · andata 8 ago · ritorno 12 ago</div>
+    <div class="fromswap" id="tSwap" style="display:none">&#8595; IMPORTATO DA SWAP PLANNER</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" id="t-and" onclick="setDir('and')">Andata<span class="sub" id="subAnd">BRI &#8594; MAD</span></button>
+    <button class="tab" id="t-rit" onclick="setDir('rit')">Ritorno<span class="sub" id="subRit">MAD &#8594; BRI</span></button>
+  </div>
+
+  <div class="resbar">
+    <span class="n" id="resn">&nbsp;</span>
+    <span class="sort">Ordina: <select id="sort" onchange="render()">
+      <option value="alt">Alternative oggi</option>
+      <option value="dep">Partenza</option>
+      <option value="dur">Durata totale</option>
+    </select></span>
+  </div>
+
+  <div id="status"></div>
+  <div id="list"></div>
+</div>
+
+<script>
+// fallback di esempio (solo anteprima senza server)
+var SAMPLE = {
+  and:[
+    {type:"direct",crit:"BRI-MAD",later:3,nextT:"17:45",totalMin:180,totalLabel:"3h 00m",
+     legs:[{from:"BRI",fromCity:"Bari",to:"MAD",toCity:"Madrid",dep:"13:30",arr:"16:30",fn:"FR 4521"}],layovers:[]},
+    {type:"stop",via:"BGY",crit:"BGY-MAD",later:2,nextT:"19:40",totalMin:355,totalLabel:"5h 55m",
+     legs:[{from:"BRI",fromCity:"Bari",to:"BGY",toCity:"Bergamo",dep:"11:10",arr:"12:35",fn:"FR 1190"},
+           {from:"BGY",fromCity:"Bergamo",to:"MAD",toCity:"Madrid",dep:"14:30",arr:"17:05",fn:"FR 6643"}],
+     layovers:[{dur:"1h 55m",at:"Bergamo",base:true}]}
+  ],
+  rit:[
+    {type:"direct",crit:"MAD-BRI",later:1,nextT:"21:40",totalMin:230,totalLabel:"3h 50m",
+     legs:[{from:"MAD",fromCity:"Madrid",to:"BRI",toCity:"Bari",dep:"17:00",arr:"20:50",fn:"FR 4522"}],layovers:[]}
+  ]
+};
+
+var RESULTS={and:[],rit:[]};
+var dir="and", saved={};
+
+function openMenu(){document.getElementById("drawer").classList.add("open");document.getElementById("ov").classList.add("open");}
+function closeMenu(){document.getElementById("drawer").classList.remove("open");document.getElementById("ov").classList.remove("open");}
+
+function setTheme(t){
+  document.documentElement.setAttribute("data-theme",t);
+  document.getElementById("th-light").className=t==="light"?"on":"";
+  document.getElementById("th-dark").className=t==="dark"?"on":"";
+  try{localStorage.setItem("fs.theme",t);}catch(e){}
+}
+
+function setDir(d){
+  dir=d;
+  document.getElementById("t-and").className=d==="and"?"tab on":"tab";
+  document.getElementById("t-rit").className=d==="rit"?"tab on":"tab";
+  render();
+}
+
+function codeOf(v){
+  var m=(v||"").toUpperCase().match(/\(([A-Z]{3})\)/);
+  if(m) return m[1];
+  var t=(v||"").trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(t)?t:"";
+}
+function fmtDate(s){
+  var mesi=["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
+  var p=(s||"").split("-"); if(p.length!==3) return s;
+  return (+p[2])+" "+mesi[(+p[1])-1];
+}
+
+async function loadAirports(){
+  try{
+    var r=await fetch("/api/airports"); if(!r.ok) return;
+    var a=await r.json();
+    var arr=Array.isArray(a)?a:Object.keys(a).map(function(k){return a[k];});
+    arr.sort(function(x,y){return (x.city||"").localeCompare(y.city||"");});
+    var html="";
+    for(var i=0;i<arr.length;i++){ var it=arr[i]; html+='<option value="'+(it.city||it.name)+' ('+it.code+')"></option>'; }
+    document.getElementById("aplist").innerHTML=html;
+  }catch(e){}
+}
+
+function ribbon(it){
+  var cls=it.later>=3?"ok":(it.later>0?"teso":"rischio");
+  var txt=it.later>0
+    ? it.later+" voli "+it.crit+" ancora oggi <span class=\"mut\">&#183; prossimo "+it.nextT+"</span>"
+    : "Ultimo "+it.crit+" del giorno <span class=\"mut\">&#183; nessuna alternativa</span>";
+  return '<div class="ribbon '+cls+'"><span>&#8635;</span><span>'+txt+'</span><span class="fr">FR</span></div>';
+}
+function endpoint(code,city,tm,right){
+  return '<div class="ep'+(right?" r":"")+'"><div class="code">'+code+'</div><div class="city">'+city+'</div><div class="tm">'+tm+'</div></div>';
+}
+function leg(l){
+  return '<div class="legrow">'+endpoint(l.from,l.fromCity,l.dep,false)
+    +'<div class="mid"><div class="fn">'+l.fn+'</div><div class="track"><span class="plane">&#9992;</span></div></div>'
+    +endpoint(l.to,l.toCity,l.arr,true)+'</div>';
+}
+function card(it,key){
+  var conn=it.type!=="direct"; var body="";
+  for(var i=0;i<it.legs.length;i++){
+    body+=leg(it.legs[i]);
+    if(i<it.layovers.length){ var lo=it.layovers[i];
+      var tag=lo.base?'<span class="base">base &#183; alternative qui</span>':'';
+      body+='<div class="layover"><span>&#8635; scalo '+lo.dur+' a '+lo.at+'</span>'+tag+'</div>';
+    }
+  }
+  body+='<div class="footline">'+it.legs[0].fn+' &#183; '+(conn?(it.legs.length+" tratte"):"volo diretto")+'</div>';
+  var stubTop=conn?'<div><div class="lbl">1 scalo</div><div class="via">via '+it.via+'</div></div>':'<div class="lbl">Diretto</div>';
+  var stub='<div class="stub">'+stubTop+'<div><div class="durlbl">totale</div><div class="dur">'+it.totalLabel+'</div></div><div class="barcode"></div></div>';
+  var sv=saved[key];
+  var btn='<button class="save'+(sv?" saved":"")+'" onclick="toggle(\''+key+'\')">'+(sv?"&#10003; Nel viaggio":"+ Salva nel viaggio")+'</button>';
+  return '<div class="pass'+(conn?" conn":"")+'">'+ribbon(it)
+    +'<div class="notch t"></div><div class="notch b"></div>'
+    +'<div class="body"><div class="main">'+body+btn+'</div>'+stub+'</div></div>';
+}
+function toggle(key){ saved[key]=!saved[key]; render(); }
+function keyOf(it){ return dir+"_"+it.crit+"_"+(it.legs[0].dep||"")+"_"+(it.via||"d"); }
+
+function render(){
+  var arr=(RESULTS[dir]||[]).slice();
+  var mode=document.getElementById("sort").value;
+  arr.sort(function(a,b){
+    if(mode==="dep") return (a.legs[0].dep||"").localeCompare(b.legs[0].dep||"");
+    if(mode==="dur") return a.totalMin-b.totalMin;
+    return b.later-a.later;
+  });
+  var html=""; for(var i=0;i<arr.length;i++){ html+=card(arr[i],keyOf(arr[i])); }
+  document.getElementById("list").innerHTML=html;
+  document.getElementById("resn").textContent=arr.length?(arr.length+" opzioni"):"";
+  var c=0; for(var k in saved){ if(saved[k]) c++; }
+  document.getElementById("cnt").textContent=c+" salvati";
+}
+
+function setStatus(html,cls){
+  var s=document.getElementById("status");
+  s.className=cls?("status "+cls):"";
+  s.innerHTML=html||"";
+}
+
+async function fetchDir(from,to,date,minH,maxH){
+  var url="/api/search?from="+from+"&to="+to+"&date="+date+"&minH="+minH+"&maxH="+maxH;
+  var r=await fetch(url);
+  var j=await r.json();
+  if(!r.ok) throw new Error(j&&j.error?j.error:("HTTP "+r.status));
+  return j.options||[];
+}
+
+function showSample(){
+  RESULTS={and:SAMPLE.and.slice(),rit:SAMPLE.rit.slice()};
+  document.getElementById("demoBanner").style.display="";
+  render();
+}
+
+async function runSearch(silent){
+  var from=codeOf(document.getElementById("f-from").value);
+  var to=codeOf(document.getElementById("f-to").value);
+  var d1=document.getElementById("f-d1").value;
+  var d2=document.getElementById("f-d2").value;
+  var minH=document.getElementById("f-min").value||"1";
+  var maxH=document.getElementById("f-max").value||"3";
+  var pax=document.getElementById("f-pax").value||"";
+  if(!from||!to){ closeMenu(); setStatus("Inserisci partenza e arrivo col codice, es. Bari (BRI).","err"); return; }
+  closeMenu();
+  document.getElementById("demoBanner").style.display="none";
+  document.getElementById("tDest").textContent=document.getElementById("f-to").value.replace(/\s*\([A-Z]{3}\)\s*/,"");
+  document.getElementById("tMeta").innerHTML="<b>"+(pax||"?")+" persone</b> &#183; andata "+fmtDate(d1)+" &#183; ritorno "+fmtDate(d2);
+  document.getElementById("subAnd").textContent=from+" \u2192 "+to;
+  document.getElementById("subRit").textContent=to+" \u2192 "+from;
+  RESULTS={and:[],rit:[]};
+  document.getElementById("list").innerHTML="";
+  setStatus('<div class="spin"></div>Cerco le combinazioni su Ryanair...','');
+  try{
+    RESULTS.and=await fetchDir(from,to,d1,minH,maxH);
+    setStatus("",null);
+    setDir("and");
+    try{ RESULTS.rit=await fetchDir(to,from,d2,minH,maxH); }catch(e2){}
+    if(dir==="rit") render();
+    if(!RESULTS.and.length){ setStatus("Nessuna combinazione per l&#39;andata con questi filtri. Allarga la finestra di scalo o cambia data.",""); }
+  }catch(e){
+    if(silent){ setStatus("",null); showSample(); return; }
+    setStatus("<b>Non riesco a leggere gli orari.</b><br>"+String(e.message||e)+"<br>Se sei in anteprima nella chat &egrave; normale: i dati reali richiedono il deploy su Vercel con le funzioni in /api. Intanto ecco un esempio.","err");
+    showSample();
+  }
+}
+function doSearch(){ runSearch(false); }
+
+try{ var st=localStorage.getItem("fs.theme"); if(st) setTheme(st); }catch(e){}
+loadAirports();
+runSearch(true);
+</script>
+</body>
+</html>
