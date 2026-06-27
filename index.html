@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>FlightScan — prototipo</title>
+<title>FlightScan</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -195,6 +195,9 @@
   .rcempty{color:var(--muted);font-size:13px;padding-top:4px}
   .rcMeta{font-size:12.5px;color:var(--muted);margin-top:3px;border-top:1px solid var(--line);padding-top:9px}
   .rcMeta b{color:var(--ink);font-weight:600}
+  .rcsaved{display:flex;flex-direction:column;gap:6px;flex:1}
+  .rcflight{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:600;font-family:'Space Mono',monospace}
+  .rcflight .x{cursor:pointer;opacity:.6;font-weight:700;font-family:'Inter',sans-serif;font-size:13px}
 </style>
 </head>
 <body>
@@ -226,14 +229,6 @@
   </div>
   <div class="field"><label>Quante persone</label><input id="f-pax" type="number" inputmode="numeric" placeholder="Quanti siete"></div>
   <button class="cerca" id="cercaBtn" onclick="doSearch()">Cerca combinazioni</button>
-
-  <details class="themebox">
-    <summary>Tema</summary>
-    <div class="seg">
-      <button id="th-light" class="on" onclick="setTheme('light')">Chiaro</button>
-      <button id="th-dark" onclick="setTheme('dark')">Scuro</button>
-    </div>
-  </details>
 </aside>
 
 <div class="overlay" id="impov" onclick="closeImport()"></div>
@@ -244,8 +239,9 @@
 
 <div class="wrap">
   <header>
-    <button class="burger" onclick="openMenu()" aria-label="Menu">&#9776;</button>
     <div class="brand">Flight<b>Scan</b></div>
+    <button class="burger" id="themeBtn" onclick="toggleTheme()" aria-label="Cambia tema">&#9790;</button>
+    <button class="burger" onclick="openMenu()" aria-label="Menu">&#9776;</button>
   </header>
 
   <div class="demo" id="demoBanner" style="display:none">Anteprima · dati di esempio. Apri il menu e premi <b>Cerca</b> per gli orari reali (richiede il deploy su Vercel).</div>
@@ -254,6 +250,7 @@
     <div class="rcEvent" id="rcEvent" style="display:none"></div>
     <div class="rcRow"><span class="rclab">Da</span><div class="rcchips" id="rcFrom"></div></div>
     <div class="rcRow"><span class="rclab">A</span><div class="rcchips" id="rcTo"></div></div>
+    <div class="rcRow" id="rcSavedRow" style="display:none"><span class="rclab">Voli</span><div class="rcsaved" id="rcSaved"></div></div>
     <div class="rcMeta" id="rcMeta"></div>
   </div>
 
@@ -285,7 +282,7 @@ var AIRPORTS=[], AIRMAP={};
 var SEL={from:[], to:[]};
 var DROPCTX={from:null, to:null};
 var RESULTS={and:[], rit:[]};
-var dir="and", saved={}, IMPORT_ROWS=[], IMPORT_EVENT="";
+var dir="and", SAVED=[], OPTBYKEY={}, IMPORT_ROWS=[], IMPORT_EVENT="";
 
 // ---- util ----
 function el(id){ return document.getElementById(id); }
@@ -298,7 +295,8 @@ function selCodes(field){ var out=[], seen={}; SEL[field].forEach(function(i){ i
 // ---- menu / tema ----
 function openMenu(){ el("drawer").classList.add("open"); el("ov").classList.add("open"); }
 function closeMenu(){ el("drawer").classList.remove("open"); el("ov").classList.remove("open"); }
-function setTheme(t){ document.documentElement.setAttribute("data-theme",t); el("th-light").className=t==="light"?"on":""; el("th-dark").className=t==="dark"?"on":""; try{localStorage.setItem("fs.theme",t);}catch(e){} }
+function setTheme(t){ document.documentElement.setAttribute("data-theme",t); var b=el("themeBtn"); if(b) b.innerHTML=(t==="dark")?"&#9728;":"&#9790;"; try{localStorage.setItem("fs.theme",t);}catch(e){} }
+function toggleTheme(){ var cur=document.documentElement.getAttribute("data-theme")||"light"; setTheme(cur==="dark"?"light":"dark"); }
 
 // ---- aeroporti ----
 async function loadAirports(){
@@ -358,13 +356,17 @@ function renderChips(field){
 }
 
 // ---- recap ----
+function savedLabel(opt){ var a=opt.legs[0], b=opt.legs[opt.legs.length-1]; var via=(opt.type==="direct")?"diretto":("via "+opt.via); return a.from+"\u2192"+b.to+"  "+a.dep+"  \u00B7 "+via; }
 function updateRecap(){
-  var has=SEL.from.length || SEL.to.length || IMPORT_EVENT;
+  var has=SEL.from.length || SEL.to.length || IMPORT_EVENT || SAVED.length;
   el("tripCard").style.display=has?"":"none";
   var ev=el("rcEvent");
   if(IMPORT_EVENT){ ev.style.display=""; ev.textContent=IMPORT_EVENT; } else { ev.style.display="none"; }
   el("rcFrom").innerHTML=SEL.from.length ? SEL.from.map(function(i){return '<span class="rcbadge">'+esc(i.label)+'</span>';}).join("") : '<span class="rcempty">da scegliere</span>';
   el("rcTo").innerHTML=SEL.to.length ? SEL.to.map(function(i){return '<span class="rcbadge">'+esc(i.label)+'</span>';}).join("") : '<span class="rcempty">da scegliere</span>';
+  var srow=el("rcSavedRow");
+  if(SAVED.length){ srow.style.display=""; el("rcSaved").innerHTML=SAVED.map(function(s){ return '<span class="rcflight">'+esc(savedLabel(s.opt))+'<span class="x" onclick="removeSaved(\''+s.key+'\')">&#10005;</span></span>'; }).join(""); }
+  else { srow.style.display="none"; el("rcSaved").innerHTML=""; }
   var pax=el("f-pax").value, d1=el("f-d1").value, d2=el("f-d2").value;
   var bits=[];
   if(pax) bits.push("<b>"+esc(pax)+" persone</b>");
@@ -416,11 +418,13 @@ function card(it,key){
   body+='<div class="footline">'+it.legs[0].fn+' &#183; '+(conn?(it.legs.length+" tratte"):"volo diretto")+'</div>';
   var stubTop=conn?'<div><div class="lbl">1 scalo</div><div class="via">via '+esc(it.via)+'</div></div>':'<div class="lbl">Diretto</div>';
   var stub='<div class="stub">'+stubTop+'<div><div class="durlbl">totale</div><div class="dur">'+it.totalLabel+'</div></div><div class="barcode"></div></div>';
-  var sv=saved[key];
+  var sv=savedHas(key);
   var btn='<button class="save'+(sv?" saved":"")+'" onclick="toggle(\''+key+'\')">'+(sv?"&#10003; Nel viaggio":"+ Salva nel viaggio")+'</button>';
   return '<div class="pass'+(conn?" conn":"")+'">'+ribbon(it)+'<div class="notch t"></div><div class="notch b"></div><div class="body"><div class="main">'+body+btn+'</div>'+stub+'</div></div>';
 }
-function toggle(key){ saved[key]=!saved[key]; render(); }
+function savedHas(key){ for(var i=0;i<SAVED.length;i++){ if(SAVED[i].key===key) return true; } return false; }
+function toggle(key){ var idx=-1; for(var i=0;i<SAVED.length;i++){ if(SAVED[i].key===key){ idx=i; break; } } if(idx>=0){ SAVED.splice(idx,1); } else if(OPTBYKEY[key]){ SAVED.push({key:key, opt:OPTBYKEY[key]}); } render(); updateRecap(); }
+function removeSaved(key){ for(var i=0;i<SAVED.length;i++){ if(SAVED[i].key===key){ SAVED.splice(i,1); break; } } render(); updateRecap(); }
 function keyOf(it){ return dir+"_"+it.legs[0].from+"_"+it.crit+"_"+(it.legs[0].dep||"")+"_"+(it.via||"d"); }
 function setDir(d){ dir=d; el("t-and").className=d==="and"?"tab on":"tab"; el("t-rit").className=d==="rit"?"tab on":"tab"; render(); }
 function render(){
@@ -431,7 +435,7 @@ function render(){
     if(mode==="dur") return a.totalMin-b.totalMin;
     return b.later-a.later;
   });
-  var html=""; for(var i=0;i<arr.length;i++){ html+=card(arr[i],keyOf(arr[i])); }
+  var html=""; for(var i=0;i<arr.length;i++){ var k=keyOf(arr[i]); OPTBYKEY[k]=arr[i]; html+=card(arr[i],k); }
   el("list").innerHTML=html;
   el("resn").textContent=arr.length?(arr.length+" opzioni"):"";
 }
@@ -507,7 +511,8 @@ document.addEventListener("click", function(e){
   ["from","to"].forEach(function(f){ var ac=el("f-"+f).parentNode; if(ac && !ac.contains(e.target)){ el("drop-"+f).classList.remove("open"); } });
 });
 
-try{ var st=localStorage.getItem("fs.theme"); if(st) setTheme(st); }catch(e){}
+var savedTheme="light"; try{ savedTheme=localStorage.getItem("fs.theme")||"light"; }catch(e){}
+setTheme(savedTheme);
 setupAC("from"); setupAC("to");
 ["f-d1","f-d2","f-pax"].forEach(function(id){ el(id).addEventListener("input", updateRecap); });
 (async function(){ await loadAirports(); SEL.from=[{label:labelFor("BRI"), codes:["BRI"]}]; renderChips("from"); updateRecap(); showEmpty(); })();
