@@ -209,7 +209,19 @@
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px 16px 18px;margin-bottom:14px}
   .ptitle{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;margin-bottom:13px}
   .trip{position:relative}
-  .rcedit{position:absolute;top:13px;right:13px;border:1px solid var(--line);background:transparent;color:var(--accent);font-family:inherit;font-weight:600;font-size:12px;border-radius:8px;padding:5px 10px;cursor:pointer}
+  .rcbtns{display:flex;justify-content:flex-end;gap:7px;margin-bottom:10px}
+  .rcbtn{border:1px solid var(--line);background:transparent;color:var(--accent);font-family:inherit;font-weight:600;font-size:12px;border-radius:8px;padding:5px 10px;cursor:pointer}
+  .rcbtn:active{background:var(--bg)}
+  .trow{display:flex;align-items:stretch;gap:0;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;overflow:hidden}
+  .trow-main{flex:1;padding:11px 13px;cursor:pointer}
+  .trow-main:active{background:var(--bg)}
+  .tn{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;color:var(--ink)}
+  .td{font-size:12px;color:var(--muted);margin-top:3px;font-family:'Space Mono',monospace}
+  .trow-x{border:none;border-left:1px solid var(--line);background:transparent;color:var(--muted);font-size:14px;cursor:pointer;padding:0 14px}
+  .trow-x:active{background:var(--bg);color:#F0796E}
+  .tdim{opacity:.7;font-size:11px}
+  #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(18px);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:11px;font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:90}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -220,11 +232,21 @@
   <div id="impBody"></div>
 </div>
 
+<div class="overlay" id="tdov" onclick="closeTrips()"></div>
+<aside class="drawer" id="tripsDrawer" aria-hidden="true">
+  <button class="dclose" onclick="closeTrips()" aria-label="Chiudi">&#10005;</button>
+  <div class="dtitle">I miei viaggi</div>
+  <button class="importbtn" onclick="newSearch()">&#43; Nuova ricerca</button>
+  <div id="tripsList"></div>
+</aside>
+
+<div id="toast"></div>
+
 <div class="wrap">
   <header>
     <div class="brand">Flight<b>Scan</b></div>
     <button class="burger" id="themeBtn" onclick="toggleTheme()" aria-label="Cambia tema">&#9790;</button>
-    <button class="burger" onclick="toggleSearch()" aria-label="Cerca">&#9776;</button>
+    <button class="burger" onclick="openTrips()" aria-label="Viaggi salvati">&#9776;</button>
   </header>
 
   <div class="demo" id="demoBanner" style="display:none">Anteprima · dati di esempio. Premi <b>Cerca</b> per gli orari reali (richiede il deploy su Vercel).</div>
@@ -257,7 +279,10 @@
   </div>
 
   <div class="trip" id="tripCard" style="display:none">
-    <button class="rcedit" onclick="openSearch()">&#9998; Modifica</button>
+    <div class="rcbtns">
+      <button class="rcbtn" onclick="saveTrip()">&#9733; Salva</button>
+      <button class="rcbtn" onclick="openSearch()">&#9998; Modifica</button>
+    </div>
     <div class="rcEvent" id="rcEvent" style="display:none"></div>
     <div class="rcRow"><span class="rclab">Da</span><div class="rcchips" id="rcFrom"></div></div>
     <div class="rcRow"><span class="rclab">A</span><div class="rcchips" id="rcTo"></div></div>
@@ -294,6 +319,7 @@ var SEL={from:null, to:null};
 var DROPCTX={from:null, to:null};
 var RESULTS={and:[], rit:[]};
 var dir="and", SAVED=[], OPTBYKEY={}, IMPORT_ROWS=[], IMPORT_EVENT="";
+var TRIPS=[], TRIP_ID=null;
 
 // ---- util ----
 function el(id){ return document.getElementById(id); }
@@ -406,6 +432,82 @@ function pickGroup(i){
   if(n) el("f-pax").value=n;
   IMPORT_EVENT=g.name||"";
   closeImport(); updateRecap();
+}
+
+// ---- viaggi salvati (condivisi su Supabase) ----
+var SB_TRIPS=SB_URL+"/rest/v1/flightscan_trips";
+function sbHeaders(extra){ var h={apikey:SB_KEY,Authorization:"Bearer "+SB_KEY}; if(extra){ for(var k in extra) h[k]=extra[k]; } return h; }
+function flash(msg){ var t=el("toast"); if(!t) return; t.textContent=msg; t.classList.add("show"); clearTimeout(window.__ft); window.__ft=setTimeout(function(){ t.classList.remove("show"); },1900); }
+
+function openTrips(){ el("tripsDrawer").classList.add("open"); el("tdov").classList.add("open"); fetchTrips(); }
+function closeTrips(){ el("tripsDrawer").classList.remove("open"); el("tdov").classList.remove("open"); }
+function newSearch(){ closeTrips(); openSearch(); }
+
+async function fetchTrips(){
+  el("tripsList").innerHTML='<div class="status"><div class="spin"></div>Carico i viaggi...</div>';
+  try{
+    var r=await fetch(SB_TRIPS+"?select=*&deleted=eq.false&order=updated_at.desc",{headers:sbHeaders()});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    renderTripsList(await r.json());
+  }catch(e){
+    el("tripsList").innerHTML='<div class="imperr"><b>Non riesco a leggere i viaggi.</b><br>Se e la prima volta, crea la tabella su Supabase (la query te l\'ha data Claude).<br><span class="tdim">Dettaglio: '+esc(String(e.message||e))+'</span></div>';
+  }
+}
+function renderTripsList(rows){
+  TRIPS=rows||[];
+  if(!TRIPS.length){ el("tripsList").innerHTML='<div class="impmuted">Nessun viaggio salvato. Crea una ricerca, salva i voli e premi <b>Salva</b> nel resoconto.</div>'; return; }
+  var html="";
+  TRIPS.forEach(function(t,i){
+    var a=(t.from_codes||"").split(",")[0]||"?", b=(t.to_codes||"").split(",")[0]||"?";
+    var route=a+" \u2192 "+b;
+    var dts=(t.date_out?fmtDate(t.date_out):"")+((t.date_out&&t.date_ret)?" \u2192 ":"")+(t.date_ret?fmtDate(t.date_ret):"");
+    var nf=(t.flights||[]).length;
+    var meta=[route]; if(dts) meta.push(dts); if(t.pax) meta.push(esc(t.pax)+" pax"); if(nf) meta.push(nf+(nf===1?" volo":" voli"));
+    html+='<div class="trow"><div class="trow-main" onclick="loadTripIdx('+i+')"><div class="tn">'+esc(t.name||route)+'</div><div class="td">'+meta.join(" \u00B7 ")+'</div></div><button class="trow-x" onclick="deleteTripIdx('+i+')" aria-label="Elimina">&#10005;</button></div>';
+  });
+  el("tripsList").innerHTML=html;
+}
+
+function currentTrip(){
+  var fl=SAVED.map(function(s){ var o=s.opt,a=o.legs[0],b=o.legs[o.legs.length-1]; return {key:s.key, dir:(s.key.indexOf("rit_")===0?"rit":"and"), type:o.type, via:o.via||"", from:a.from, to:b.to, dep:a.dep, arr:b.arr, total:o.totalLabel, fn:a.fn||""}; });
+  var nm=IMPORT_EVENT || ((SEL.from?SEL.from.codes[0]:"?")+" \u2192 "+(SEL.to?SEL.to.codes[0]:"?"));
+  return { id: TRIP_ID || ("tr_"+Date.now()), name: nm,
+    from_label: SEL.from?SEL.from.label:"", from_codes: SEL.from?SEL.from.codes.join(","):"",
+    to_label: SEL.to?SEL.to.label:"", to_codes: SEL.to?SEL.to.codes.join(","):"",
+    date_out: el("f-d1").value, date_ret: el("f-d2").value, pax: el("f-pax").value,
+    flights: fl, deleted:false, updated_at:new Date().toISOString() };
+}
+async function saveTrip(){
+  if(!SEL.from && !SEL.to && !IMPORT_EVENT && !SAVED.length){ flash("Niente da salvare"); return; }
+  var t=currentTrip(); TRIP_ID=t.id;
+  try{
+    var r=await fetch(SB_TRIPS,{method:"POST",headers:sbHeaders({"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"}),body:JSON.stringify(t)});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    flash("Viaggio salvato");
+  }catch(e){ flash("Salvataggio non riuscito"); }
+}
+
+function loadTripIdx(i){ var t=TRIPS[i]; if(t) loadTrip(t); }
+function loadTrip(t){
+  TRIP_ID=t.id; IMPORT_EVENT=t.name||"";
+  SEL.from = t.from_codes ? {label:(t.from_label||t.from_codes), codes:t.from_codes.split(",")} : null;
+  SEL.to   = t.to_codes   ? {label:(t.to_label||t.to_codes),   codes:t.to_codes.split(",")}   : null;
+  el("f-from").value=SEL.from?SEL.from.label:""; el("clear-from").style.display=SEL.from?"":"none";
+  el("f-to").value=SEL.to?SEL.to.label:""; el("clear-to").style.display=SEL.to?"":"none";
+  el("f-d1").value=t.date_out||""; el("f-d2").value=t.date_ret||""; el("f-pax").value=t.pax||"";
+  SAVED=(t.flights||[]).map(function(f){
+    var key=f.key || ((f.dir||"and")+"_"+f.from+"_"+f.dep+"_"+(f.via||"d"));
+    return { key:key, opt:{ type:f.type||(f.via?"stop":"direct"), via:f.via||"", totalLabel:f.total||"", legs:[{from:f.from,to:f.to,dep:f.dep,arr:f.arr,fn:f.fn||""}] } };
+  });
+  OPTBYKEY={}; SAVED.forEach(function(s){ OPTBYKEY[s.key]=s.opt; });
+  closeTrips(); closeSearch(); updateRecap();
+  flash("Viaggio caricato");
+}
+async function deleteTripIdx(i){
+  var t=TRIPS[i]; if(!t) return;
+  try{ await fetch(SB_TRIPS+"?id=eq."+encodeURIComponent(t.id),{method:"PATCH",headers:sbHeaders({"Content-Type":"application/json"}),body:JSON.stringify({deleted:true,updated_at:new Date().toISOString()})}); }catch(e){}
+  if(TRIP_ID===t.id) TRIP_ID=null;
+  fetchTrips();
 }
 
 // ---- rendering risultati ----
