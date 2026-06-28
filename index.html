@@ -196,43 +196,21 @@
   .rcempty{color:var(--muted);font-size:13px;padding-top:4px}
   .rcMeta{font-size:12.5px;color:var(--muted);margin-top:3px;border-top:1px solid var(--line);padding-top:9px}
   .rcMeta b{color:var(--ink);font-weight:600}
-  .rcsaved{display:flex;flex-direction:column;gap:6px;flex:1}
-  .rcflight{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:600;font-family:'Space Mono',monospace}
-  .rcflight .x{cursor:pointer;opacity:.6;font-weight:700;font-family:'Inter',sans-serif;font-size:13px}
+  .rcsaved{display:flex;flex-direction:column;gap:7px;flex:1}
+  .rcflight{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+  .rcf-top{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+  .rcf-tag{font-size:10px;letter-spacing:.4px;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 6px;border-radius:5px}
+  .rcf-route{font-family:'Space Mono',monospace;font-weight:700;font-size:14px;color:var(--ink)}
+  .rcf-sub{font-size:12px;color:var(--muted);line-height:1.55}
+  .rcflight .x{cursor:pointer;opacity:.55;font-weight:700;font-size:13px;color:var(--muted);padding-left:4px}
+  /* homepage search panel */
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px 16px 18px;margin-bottom:14px}
+  .ptitle{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;margin-bottom:13px}
+  .trip{position:relative}
+  .rcedit{position:absolute;top:13px;right:13px;border:1px solid var(--line);background:transparent;color:var(--accent);font-family:inherit;font-weight:600;font-size:12px;border-radius:8px;padding:5px 10px;cursor:pointer}
 </style>
 </head>
 <body>
-
-<div class="overlay" id="ov" onclick="closeMenu()"></div>
-<aside class="drawer" id="drawer" aria-hidden="true">
-  <button class="dclose" onclick="closeMenu()" aria-label="Chiudi">&#10005;</button>
-  <div class="dtitle">Impostazioni</div>
-
-  <div class="sec">Ricerca</div>
-  <button class="importbtn" onclick="openImport()">&#8595; Importa un gruppo da Swap Planner</button>
-  <div class="field"><label>Partenza</label>
-    <div class="ac">
-      <div class="acbar"><span class="chips" id="chips-from"></span><input id="f-from" autocomplete="off" placeholder="Aeroporto o citta"></div>
-      <div class="acdrop" id="drop-from"></div>
-    </div>
-  </div>
-  <div class="field"><label>Arrivo</label>
-    <div class="ac">
-      <div class="acbar"><span class="chips" id="chips-to"></span><input id="f-to" autocomplete="off" placeholder="Aeroporto o citta"></div>
-      <div class="acdrop" id="drop-to"></div>
-    </div>
-  </div>
-  <div class="row2">
-    <div class="field"><label>Andata</label><input id="f-d1" type="date"></div>
-    <div class="field"><label>Ritorno</label><input id="f-d2" type="date"></div>
-  </div>
-  <div class="row2">
-    <div class="field"><label>Scalo min (h)</label><input id="f-min" type="number" inputmode="decimal" value="1"></div>
-    <div class="field"><label>Scalo max (h)</label><input id="f-max" type="number" inputmode="decimal" value="3"></div>
-  </div>
-  <div class="field"><label>Quante persone</label><input id="f-pax" type="number" inputmode="numeric" placeholder="Quanti siete"></div>
-  <button class="cerca" id="cercaBtn" onclick="doSearch()">Cerca combinazioni</button>
-</aside>
 
 <div class="overlay" id="impov" onclick="closeImport()"></div>
 <div class="modal" id="impModal" aria-hidden="true">
@@ -244,12 +222,40 @@
   <header>
     <div class="brand">Flight<b>Scan</b></div>
     <button class="burger" id="themeBtn" onclick="toggleTheme()" aria-label="Cambia tema">&#9790;</button>
-    <button class="burger" onclick="openMenu()" aria-label="Menu">&#9776;</button>
+    <button class="burger" onclick="toggleSearch()" aria-label="Cerca">&#9776;</button>
   </header>
 
-  <div class="demo" id="demoBanner" style="display:none">Anteprima · dati di esempio. Apri il menu e premi <b>Cerca</b> per gli orari reali (richiede il deploy su Vercel).</div>
+  <div class="demo" id="demoBanner" style="display:none">Anteprima · dati di esempio. Premi <b>Cerca</b> per gli orari reali (richiede il deploy su Vercel).</div>
+
+  <div class="panel" id="searchPanel">
+    <div class="ptitle">Cerca un volo</div>
+    <button class="importbtn" onclick="openImport()">&#8595; Importa un gruppo da Swap Planner</button>
+    <div class="field"><label>Partenza</label>
+      <div class="ac">
+        <div class="acbar"><span class="chips" id="chips-from"></span><input id="f-from" autocomplete="off" placeholder="Bari (BRI)"></div>
+        <div class="acdrop" id="drop-from"></div>
+      </div>
+    </div>
+    <div class="field"><label>Arrivo</label>
+      <div class="ac">
+        <div class="acbar"><span class="chips" id="chips-to"></span><input id="f-to" autocomplete="off" placeholder="Aeroporto o citta"></div>
+        <div class="acdrop" id="drop-to"></div>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Andata</label><input id="f-d1" type="date"></div>
+      <div class="field"><label>Ritorno</label><input id="f-d2" type="date"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Scalo min (h)</label><input id="f-min" type="number" inputmode="decimal" value="1"></div>
+      <div class="field"><label>Scalo max (h)</label><input id="f-max" type="number" inputmode="decimal" value="3"></div>
+    </div>
+    <div class="field"><label>Quante persone</label><input id="f-pax" type="number" inputmode="numeric" placeholder="Quanti siete"></div>
+    <button class="cerca" id="cercaBtn" onclick="doSearch()">Cerca combinazioni</button>
+  </div>
 
   <div class="trip" id="tripCard" style="display:none">
+    <button class="rcedit" onclick="openSearch()">&#9998; Modifica</button>
     <div class="rcEvent" id="rcEvent" style="display:none"></div>
     <div class="rcRow"><span class="rclab">Da</span><div class="rcchips" id="rcFrom"></div></div>
     <div class="rcRow"><span class="rclab">A</span><div class="rcchips" id="rcTo"></div></div>
@@ -257,12 +263,12 @@
     <div class="rcMeta" id="rcMeta"></div>
   </div>
 
-  <div class="tabs">
-    <button class="tab on" id="t-and" onclick="setDir('and')">Andata<span class="sub" id="subAnd">BRI &#8594; MAD</span></button>
-    <button class="tab" id="t-rit" onclick="setDir('rit')">Ritorno<span class="sub" id="subRit">MAD &#8594; BRI</span></button>
+  <div class="tabs" id="tabsBar" style="display:none">
+    <button class="tab on" id="t-and" onclick="setDir('and')">Andata<span class="sub" id="subAnd"></span></button>
+    <button class="tab" id="t-rit" onclick="setDir('rit')">Ritorno<span class="sub" id="subRit"></span></button>
   </div>
 
-  <div class="resbar">
+  <div class="resbar" id="resBar" style="display:none">
     <span class="n" id="resn">&nbsp;</span>
     <span class="sort">Ordina: <select id="sort" onchange="render()">
       <option value="alt">Alternative oggi</option>
@@ -296,8 +302,9 @@ function fmtDate(s){ var mesi=["gen","feb","mar","apr","mag","giu","lug","ago","
 function selCodes(field){ var out=[], seen={}; SEL[field].forEach(function(i){ i.codes.forEach(function(c){ if(!seen[c]){seen[c]=1; out.push(c);} }); }); return out; }
 
 // ---- menu / tema ----
-function openMenu(){ el("drawer").classList.add("open"); el("ov").classList.add("open"); }
-function closeMenu(){ el("drawer").classList.remove("open"); el("ov").classList.remove("open"); }
+function openSearch(){ el("searchPanel").style.display=""; updateRecap(); try{window.scrollTo(0,0);}catch(e){} }
+function closeSearch(){ el("searchPanel").style.display="none"; updateRecap(); }
+function toggleSearch(){ if(el("searchPanel").style.display==="none"){ openSearch(); } else { closeSearch(); } }
 function setTheme(t){ document.documentElement.setAttribute("data-theme",t); var b=el("themeBtn"); if(b) b.innerHTML=(t==="dark")?"&#9728;":"&#9790;"; try{localStorage.setItem("fs.theme",t);}catch(e){} }
 function toggleTheme(){ var cur=document.documentElement.getAttribute("data-theme")||"light"; setTheme(cur==="dark"?"light":"dark"); }
 
@@ -359,16 +366,17 @@ function renderChips(field){
 }
 
 // ---- recap ----
-function savedLabel(opt){ var a=opt.legs[0], b=opt.legs[opt.legs.length-1]; var via=(opt.type==="direct")?"diretto":("via "+opt.via); return a.from+"\u2192"+b.to+"  "+a.dep+"  \u00B7 "+via; }
+function savedCard(s){ var o=s.opt, a=o.legs[0], b=o.legs[o.legs.length-1]; var dirTag=(s.key.indexOf("rit_")===0)?"ritorno":"andata"; var typ=(o.type==="direct")?("Diretto \u00B7 "+a.fn):("1 scalo via "+esc(o.via)); return '<div class="rcflight"><div class="rcf-main"><div class="rcf-top"><span class="rcf-tag">'+dirTag+'</span><span class="rcf-route">'+a.from+' \u2192 '+b.to+'</span></div><div class="rcf-sub">'+typ+' \u00B7 '+o.totalLabel+'</div><div class="rcf-sub">'+a.dep+' \u2192 '+b.arr+'</div></div><span class="x" onclick="removeSaved(\''+s.key+'\')">&#10005;</span></div>'; }
 function updateRecap(){
+  var panelOpen=el("searchPanel") && el("searchPanel").style.display!=="none";
   var has=SEL.from.length || SEL.to.length || IMPORT_EVENT || SAVED.length;
-  el("tripCard").style.display=has?"":"none";
+  el("tripCard").style.display=(has && !panelOpen)?"":"none";
   var ev=el("rcEvent");
   if(IMPORT_EVENT){ ev.style.display=""; ev.textContent=IMPORT_EVENT; } else { ev.style.display="none"; }
   el("rcFrom").innerHTML=SEL.from.length ? SEL.from.map(function(i){return '<span class="rcbadge">'+esc(i.label)+'</span>';}).join("") : '<span class="rcempty">da scegliere</span>';
   el("rcTo").innerHTML=SEL.to.length ? SEL.to.map(function(i){return '<span class="rcbadge">'+esc(i.label)+'</span>';}).join("") : '<span class="rcempty">da scegliere</span>';
   var srow=el("rcSavedRow");
-  if(SAVED.length){ srow.style.display=""; el("rcSaved").innerHTML=SAVED.map(function(s){ return '<span class="rcflight">'+esc(savedLabel(s.opt))+'<span class="x" onclick="removeSaved(\''+s.key+'\')">&#10005;</span></span>'; }).join(""); }
+  if(SAVED.length){ srow.style.display=""; el("rcSaved").innerHTML=SAVED.map(function(s){ return savedCard(s); }).join(""); }
   else { srow.style.display="none"; el("rcSaved").innerHTML=""; }
   var pax=el("f-pax").value, d1=el("f-d1").value, d2=el("f-d2").value;
   var bits=[];
@@ -447,6 +455,7 @@ function render(){
 function setStatus(html,cls){ var s=el("status"); s.className=cls?("status "+cls):""; s.innerHTML=html||""; }
 function showEmpty(){
   el("demoBanner").style.display="none";
+  el("tabsBar").style.display="none"; el("resBar").style.display="none";
   el("resn").textContent=""; el("list").innerHTML="";
   setStatus('<div class="empty"><div class="eplane">&#9992;</div><div class="ettl">Pronto al decollo</div><div>Apri il menu <b>&#9776;</b>, aggiungi partenza, arrivo e date.<br>Oppure importa un gruppo da Swap Planner.</div></div>','');
 }
@@ -468,11 +477,11 @@ function pairsOf(F,T){ var p=[]; F.forEach(function(f){ T.forEach(function(t){ i
 
 async function doSearch(){
   var froms=selCodes("from"), tos=selCodes("to");
-  if(!froms.length || !tos.length){ closeMenu(); setStatus("Aggiungi almeno una partenza e un arrivo.","err"); return; }
+  if(!froms.length || !tos.length){ closeSearch(); setStatus("Aggiungi almeno una partenza e un arrivo.","err"); return; }
   var d1=el("f-d1").value, d2=el("f-d2").value;
-  if(!d1){ closeMenu(); setStatus("Scegli almeno la data di andata.","err"); return; }
+  if(!d1){ closeSearch(); setStatus("Scegli almeno la data di andata.","err"); return; }
   var minH=el("f-min").value||"1", maxH=el("f-max").value||"3";
-  closeMenu(); updateRecap();
+  closeSearch(); updateRecap();
   el("demoBanner").style.display="none";
   var F=froms.slice(0,3), T=tos.slice(0,3);
   el("subAnd").textContent=F.join("/")+" \u2192 "+T.join("/");
@@ -485,6 +494,7 @@ async function doSearch(){
     var ok=settled.filter(function(s){return s.status==="fulfilled";}).map(function(s){return s.value;});
     if(!ok.length){ var rj=settled.filter(function(s){return s.status==="rejected";})[0]; throw new Error(rj?rj.reason.message:"nessun risultato"); }
     RESULTS.and=mergeOpts(ok);
+    el("tabsBar").style.display=""; el("resBar").style.display="";
     setStatus("",null); setDir("and");
     if(d2){
       var s2=await Promise.allSettled(pairs.map(function(p){ return fetchPair(p[1],p[0],d2,minH,maxH); }));
@@ -503,7 +513,7 @@ var SAMPLE=[
   {type:"direct",crit:"BRI-MAD",later:3,nextT:"17:45",totalMin:180,totalLabel:"3h 00m",legs:[{from:"BRI",fromCity:"Bari",to:"MAD",toCity:"Madrid",dep:"13:30",arr:"16:30",fn:"FR 4521"}],layovers:[]},
   {type:"stop",via:"BGY",crit:"BGY-MAD",later:2,nextT:"19:40",totalMin:355,totalLabel:"5h 55m",legs:[{from:"BRI",fromCity:"Bari",to:"BGY",toCity:"Bergamo",dep:"11:10",arr:"12:35",fn:"FR 1190"},{from:"BGY",fromCity:"Bergamo",to:"MAD",toCity:"Madrid",dep:"14:30",arr:"17:05",fn:"FR 6643"}],layovers:[{dur:"1h 55m",at:"Bergamo",base:true}]}
 ];
-function showSample(){ RESULTS={and:SAMPLE.slice(),rit:[]}; el("demoBanner").style.display=""; setDir("and"); }
+function showSample(){ el("tabsBar").style.display=""; el("resBar").style.display=""; RESULTS={and:SAMPLE.slice(),rit:[]}; el("demoBanner").style.display=""; setDir("and"); }
 
 // ---- setup ----
 function setupAC(field){
@@ -519,7 +529,7 @@ var savedTheme="light"; try{ savedTheme=localStorage.getItem("fs.theme")||"light
 setTheme(savedTheme);
 setupAC("from"); setupAC("to");
 ["f-d1","f-d2","f-pax"].forEach(function(id){ el(id).addEventListener("input", updateRecap); });
-(async function(){ await loadAirports(); SEL.from=[{label:labelFor("BRI"), codes:["BRI"]}]; renderChips("from"); updateRecap(); showEmpty(); })();
+(async function(){ await loadAirports(); openSearch(); })();
 </script>
 </body>
 </html>
