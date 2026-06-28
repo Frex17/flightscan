@@ -210,8 +210,8 @@
   .ptitle{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;margin-bottom:13px}
   .trip{position:relative}
   .rcbtns{display:flex;justify-content:flex-end;gap:7px;margin-bottom:10px}
-  .rcbtn{border:1px solid var(--line);background:transparent;color:var(--accent);font-family:inherit;font-weight:600;font-size:12px;border-radius:8px;padding:5px 10px;cursor:pointer}
-  .rcbtn:active{background:var(--bg)}
+  .rcbtn{border:1px solid var(--line);background:transparent;color:var(--accent);font-family:inherit;font-weight:600;font-size:12px;border-radius:8px;padding:5px 10px;cursor:pointer;transition:background .12s,color .12s,border-color .12s,box-shadow .12s}
+  .rcbtn:active,.rcbtn.lit{background:var(--accent);color:var(--bg);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .trow{display:flex;align-items:stretch;gap:0;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;overflow:hidden}
   .trow-main{flex:1;padding:11px 13px;cursor:pointer}
   .trow-main:active{background:var(--bg)}
@@ -244,9 +244,9 @@
 
 <div class="wrap">
   <header>
+    <button class="burger" onclick="openTrips()" aria-label="Viaggi salvati">&#9776;</button>
     <div class="brand">Flight<b>Scan</b></div>
     <button class="burger" id="themeBtn" onclick="toggleTheme()" aria-label="Cambia tema">&#9790;</button>
-    <button class="burger" onclick="openTrips()" aria-label="Viaggi salvati">&#9776;</button>
   </header>
 
   <div class="demo" id="demoBanner" style="display:none">Anteprima · dati di esempio. Premi <b>Cerca</b> per gli orari reali (richiede il deploy su Vercel).</div>
@@ -280,8 +280,8 @@
 
   <div class="trip" id="tripCard" style="display:none">
     <div class="rcbtns">
-      <button class="rcbtn" onclick="saveTrip()">&#9733; Salva</button>
-      <button class="rcbtn" onclick="openSearch()">&#9998; Modifica</button>
+      <button class="rcbtn" onclick="litBtn(this);saveTrip()">&#9733; Salva</button>
+      <button class="rcbtn" onclick="litBtn(this);openSearch()">&#9998; Modifica</button>
     </div>
     <div class="rcEvent" id="rcEvent" style="display:none"></div>
     <div class="rcRow"><span class="rclab">Da</span><div class="rcchips" id="rcFrom"></div></div>
@@ -438,6 +438,7 @@ function pickGroup(i){
 var SB_TRIPS=SB_URL+"/rest/v1/flightscan_trips";
 function sbHeaders(extra){ var h={apikey:SB_KEY,Authorization:"Bearer "+SB_KEY}; if(extra){ for(var k in extra) h[k]=extra[k]; } return h; }
 function flash(msg){ var t=el("toast"); if(!t) return; t.textContent=msg; t.classList.add("show"); clearTimeout(window.__ft); window.__ft=setTimeout(function(){ t.classList.remove("show"); },1900); }
+function litBtn(b){ if(!b) return; b.classList.add("lit"); setTimeout(function(){ b.classList.remove("lit"); },280); }
 
 function openTrips(){ el("tripsDrawer").classList.add("open"); el("tdov").classList.add("open"); fetchTrips(); }
 function closeTrips(){ el("tripsDrawer").classList.remove("open"); el("tdov").classList.remove("open"); }
@@ -484,6 +485,7 @@ async function saveTrip(){
     var r=await fetch(SB_TRIPS,{method:"POST",headers:sbHeaders({"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"}),body:JSON.stringify(t)});
     if(!r.ok) throw new Error("HTTP "+r.status);
     flash("Viaggio salvato");
+    openTrips();
   }catch(e){ flash("Salvataggio non riuscito"); }
 }
 
