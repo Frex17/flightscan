@@ -178,6 +178,8 @@
   .chip .x{cursor:pointer;opacity:.65;font-weight:700;font-size:14px;line-height:1}
   .acbar input{flex:1;min-width:100px;border:none;background:transparent;font-family:inherit;font-size:16px;color:var(--ink);padding:4px 0}
   .acbar input:focus{outline:none}
+  .acclear{border:none;background:transparent;color:var(--muted);font-size:15px;cursor:pointer;padding:0 2px;line-height:1;opacity:.55}
+  .acclear:hover{opacity:1}
   .acdrop{position:absolute;left:0;right:0;top:100%;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);margin-top:5px;max-height:240px;overflow-y:auto;display:none}
   .acdrop.open{display:block}
   .acitem{padding:10px 12px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line)}
@@ -232,13 +234,13 @@
     <button class="importbtn" onclick="openImport()">&#8595; Importa un gruppo da Swap Planner</button>
     <div class="field"><label>Partenza</label>
       <div class="ac">
-        <div class="acbar"><span class="chips" id="chips-from"></span><input id="f-from" autocomplete="off" placeholder="Bari (BRI)"></div>
+        <div class="acbar"><input id="f-from" autocomplete="off" placeholder="Aeroporto o città"><button class="acclear" id="clear-from" onclick="clearField('from')" style="display:none" aria-label="Cancella">&#10005;</button></div>
         <div class="acdrop" id="drop-from"></div>
       </div>
     </div>
     <div class="field"><label>Arrivo</label>
       <div class="ac">
-        <div class="acbar"><span class="chips" id="chips-to"></span><input id="f-to" autocomplete="off" placeholder="Aeroporto o citta"></div>
+        <div class="acbar"><input id="f-to" autocomplete="off" placeholder="Aeroporto o città"><button class="acclear" id="clear-to" onclick="clearField('to')" style="display:none" aria-label="Cancella">&#10005;</button></div>
         <div class="acdrop" id="drop-to"></div>
       </div>
     </div>
@@ -288,7 +290,7 @@ var SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 
 // ---- stato ----
 var AIRPORTS=[], AIRMAP={};
-var SEL={from:[], to:[]};
+var SEL={from:null, to:null};
 var DROPCTX={from:null, to:null};
 var RESULTS={and:[], rit:[]};
 var dir="and", SAVED=[], OPTBYKEY={}, IMPORT_ROWS=[], IMPORT_EVENT="";
@@ -299,7 +301,7 @@ function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,
 function norm(s){ return String(s==null?"":s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim(); }
 function metroOf(name){ return String(name||"").trim().split(/\s+/)[0]; }
 function fmtDate(s){ var mesi=["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"]; var p=(s||"").split("-"); if(p.length!==3) return s; return (+p[2])+" "+mesi[(+p[1])-1]; }
-function selCodes(field){ var out=[], seen={}; SEL[field].forEach(function(i){ i.codes.forEach(function(c){ if(!seen[c]){seen[c]=1; out.push(c);} }); }); return out; }
+function selCodes(field){ return SEL[field]?SEL[field].codes.slice():[]; }
 
 // ---- menu / tema ----
 function openSearch(){ el("searchPanel").style.display=""; updateRecap(); try{window.scrollTo(0,0);}catch(e){} }
@@ -325,9 +327,7 @@ function renderDrop(field){
   var inp=el("f-"+field), drop=el("drop-"+field);
   var q=norm(inp.value);
   if(q.length<1){ drop.classList.remove("open"); drop.innerHTML=""; return; }
-  var chosen={}; selCodes(field).forEach(function(c){chosen[c]=1;});
   var matches=AIRPORTS.filter(function(a){
-    if(chosen[a.code]) return false;
     return norm(a.code).indexOf(q)===0 || norm(a.name).indexOf(q)>=0 || norm(a.city).indexOf(q)>=0 || norm(a.metro).indexOf(q)>=0;
   });
   var groups={};
@@ -346,35 +346,27 @@ function renderDrop(field){
   if(!html) html='<div class="acitem"><span class="acsub">Nessun aeroporto</span></div>';
   drop.innerHTML=html; drop.classList.add("open");
 }
-function addSel(field, item){
-  var have={}; selCodes(field).forEach(function(c){have[c]=1;});
-  var codes=item.codes.filter(function(c){return !have[c];});
-  if(!codes.length) return;
-  SEL[field].push({label:item.label, codes:codes});
-  el("f-"+field).value=""; el("drop-"+field).classList.remove("open"); el("drop-"+field).innerHTML="";
-  renderChips(field); updateRecap();
+function setSel(field, item){
+  SEL[field]=item;
+  el("f-"+field).value=item.label;
+  el("clear-"+field).style.display="";
+  el("drop-"+field).classList.remove("open"); el("drop-"+field).innerHTML="";
+  updateRecap();
 }
-function pickItem(field, ii){ var a=DROPCTX[field] && DROPCTX[field].items[ii]; if(!a) return; addSel(field,{label:labelFor(a.code), codes:[a.code]}); }
-function pickMetro(field, gi){ var m=DROPCTX[field] && DROPCTX[field].metros[gi]; if(!m) return; addSel(field,{label:m[0].metro+" \u00B7 tutti", codes:m.map(function(x){return x.code;})}); }
-function removeChip(field, idx){ SEL[field].splice(idx,1); renderChips(field); updateRecap(); }
-function renderChips(field){
-  var box=el("chips-"+field), html="";
-  SEL[field].forEach(function(it,i){
-    html+='<span class="chip"><span class="cc">'+esc(it.label)+'</span><span class="x" onclick="removeChip(\''+field+'\','+i+')">&#10005;</span></span>';
-  });
-  box.innerHTML=html;
-}
+function pickItem(field, ii){ var a=DROPCTX[field] && DROPCTX[field].items[ii]; if(!a) return; setSel(field,{label:labelFor(a.code), codes:[a.code]}); }
+function pickMetro(field, gi){ var m=DROPCTX[field] && DROPCTX[field].metros[gi]; if(!m) return; setSel(field,{label:m[0].metro+" \u00B7 tutti", codes:m.map(function(x){return x.code;})}); }
+function clearField(field){ SEL[field]=null; el("f-"+field).value=""; el("clear-"+field).style.display="none"; el("drop-"+field).classList.remove("open"); el("drop-"+field).innerHTML=""; updateRecap(); }
 
 // ---- recap ----
 function savedCard(s){ var o=s.opt, a=o.legs[0], b=o.legs[o.legs.length-1]; var dirTag=(s.key.indexOf("rit_")===0)?"ritorno":"andata"; var typ=(o.type==="direct")?("Diretto \u00B7 "+a.fn):("1 scalo via "+esc(o.via)); return '<div class="rcflight"><div class="rcf-main"><div class="rcf-top"><span class="rcf-tag">'+dirTag+'</span><span class="rcf-route">'+a.from+' \u2192 '+b.to+'</span></div><div class="rcf-sub">'+typ+' \u00B7 '+o.totalLabel+'</div><div class="rcf-sub">'+a.dep+' \u2192 '+b.arr+'</div></div><span class="x" onclick="removeSaved(\''+s.key+'\')">&#10005;</span></div>'; }
 function updateRecap(){
   var panelOpen=el("searchPanel") && el("searchPanel").style.display!=="none";
-  var has=SEL.from.length || SEL.to.length || IMPORT_EVENT || SAVED.length;
+  var has=SEL.from || SEL.to || IMPORT_EVENT || SAVED.length;
   el("tripCard").style.display=(has && !panelOpen)?"":"none";
   var ev=el("rcEvent");
   if(IMPORT_EVENT){ ev.style.display=""; ev.textContent=IMPORT_EVENT; } else { ev.style.display="none"; }
-  el("rcFrom").innerHTML=SEL.from.length ? SEL.from.map(function(i){return '<span class="rcbadge">'+esc(i.label)+'</span>';}).join("") : '<span class="rcempty">da scegliere</span>';
-  el("rcTo").innerHTML=SEL.to.length ? SEL.to.map(function(i){return '<span class="rcbadge">'+esc(i.label)+'</span>';}).join("") : '<span class="rcempty">da scegliere</span>';
+  el("rcFrom").innerHTML=SEL.from ? '<span class="rcbadge">'+esc(SEL.from.label)+'</span>' : '<span class="rcempty">da scegliere</span>';
+  el("rcTo").innerHTML=SEL.to ? '<span class="rcbadge">'+esc(SEL.to.label)+'</span>' : '<span class="rcempty">da scegliere</span>';
   var srow=el("rcSavedRow");
   if(SAVED.length){ srow.style.display=""; el("rcSaved").innerHTML=SAVED.map(function(s){ return savedCard(s); }).join(""); }
   else { srow.style.display="none"; el("rcSaved").innerHTML=""; }
@@ -408,7 +400,7 @@ async function openImport(){
 function pickGroup(i){
   var g=IMPORT_ROWS[i]; if(!g) return;
   var n=paxCount(g.participants);
-  SEL.from=[]; SEL.to=[]; renderChips("from"); renderChips("to"); el("f-from").value=""; el("f-to").value="";
+  clearField("from"); clearField("to");
   if(g.start_day) el("f-d1").value=g.start_day;
   if(g.end_day) el("f-d2").value=g.end_day;
   if(n) el("f-pax").value=n;
@@ -518,8 +510,8 @@ function showSample(){ el("tabsBar").style.display=""; el("resBar").style.displa
 // ---- setup ----
 function setupAC(field){
   var inp=el("f-"+field);
-  inp.addEventListener("input", function(){ renderDrop(field); });
-  inp.addEventListener("focus", function(){ if(inp.value) renderDrop(field); });
+  inp.addEventListener("input", function(){ SEL[field]=null; el("clear-"+field).style.display=inp.value?"":"none"; renderDrop(field); });
+  inp.addEventListener("focus", function(){ if(SEL[field]){ try{inp.select();}catch(e){} return; } if(inp.value) renderDrop(field); });
 }
 document.addEventListener("click", function(e){
   ["from","to"].forEach(function(f){ var ac=el("f-"+f).closest(".ac"); if(ac && !ac.contains(e.target)){ el("drop-"+f).classList.remove("open"); } });
