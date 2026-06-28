@@ -170,13 +170,14 @@
   .themebox .seg{margin-top:12px}
   /* autocomplete + chips */
   .ac{position:relative}
+  .acbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;border-bottom:1.5px solid var(--line);padding:5px 0}
+  .acbar:focus-within{border-color:var(--accent)}
   .chips{display:flex;flex-wrap:wrap;gap:6px}
-  .chips:not(:empty){margin-bottom:8px}
   .chip{display:inline-flex;align-items:center;gap:7px;background:var(--accent-soft);color:var(--accent);border-radius:8px;padding:5px 9px;font-size:12.5px;font-weight:600}
   .chip .cc{font-family:'Space Mono',monospace}
   .chip .x{cursor:pointer;opacity:.65;font-weight:700;font-size:14px;line-height:1}
-  .ac input{width:100%;border:none;border-bottom:1.5px solid var(--line);background:transparent;font-family:inherit;font-size:16px;color:var(--ink);padding:6px 0}
-  .ac input:focus{outline:none;border-color:var(--accent)}
+  .acbar input{flex:1;min-width:100px;border:none;background:transparent;font-family:inherit;font-size:16px;color:var(--ink);padding:4px 0}
+  .acbar input:focus{outline:none}
   .acdrop{position:absolute;left:0;right:0;top:100%;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);margin-top:5px;max-height:240px;overflow-y:auto;display:none}
   .acdrop.open{display:block}
   .acitem{padding:10px 12px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line)}
@@ -210,14 +211,16 @@
   <div class="sec">Ricerca</div>
   <button class="importbtn" onclick="openImport()">&#8595; Importa un gruppo da Swap Planner</button>
   <div class="field"><label>Partenza</label>
-    <div class="ac"><div class="chips" id="chips-from"></div>
-      <input id="f-from" autocomplete="off" placeholder="Aeroporto o citta">
-      <div class="acdrop" id="drop-from"></div></div>
+    <div class="ac">
+      <div class="acbar"><span class="chips" id="chips-from"></span><input id="f-from" autocomplete="off" placeholder="Aeroporto o citta"></div>
+      <div class="acdrop" id="drop-from"></div>
+    </div>
   </div>
   <div class="field"><label>Arrivo</label>
-    <div class="ac"><div class="chips" id="chips-to"></div>
-      <input id="f-to" autocomplete="off" placeholder="Aeroporto o citta">
-      <div class="acdrop" id="drop-to"></div></div>
+    <div class="ac">
+      <div class="acbar"><span class="chips" id="chips-to"></span><input id="f-to" autocomplete="off" placeholder="Aeroporto o citta"></div>
+      <div class="acdrop" id="drop-to"></div>
+    </div>
   </div>
   <div class="row2">
     <div class="field"><label>Andata</label><input id="f-d1" type="date"></div>
@@ -397,6 +400,7 @@ async function openImport(){
 function pickGroup(i){
   var g=IMPORT_ROWS[i]; if(!g) return;
   var n=paxCount(g.participants);
+  SEL.from=[]; SEL.to=[]; renderChips("from"); renderChips("to"); el("f-from").value=""; el("f-to").value="";
   if(g.start_day) el("f-d1").value=g.start_day;
   if(g.end_day) el("f-d2").value=g.end_day;
   if(n) el("f-pax").value=n;
@@ -508,7 +512,7 @@ function setupAC(field){
   inp.addEventListener("focus", function(){ if(inp.value) renderDrop(field); });
 }
 document.addEventListener("click", function(e){
-  ["from","to"].forEach(function(f){ var ac=el("f-"+f).parentNode; if(ac && !ac.contains(e.target)){ el("drop-"+f).classList.remove("open"); } });
+  ["from","to"].forEach(function(f){ var ac=el("f-"+f).closest(".ac"); if(ac && !ac.contains(e.target)){ el("drop-"+f).classList.remove("open"); } });
 });
 
 var savedTheme="light"; try{ savedTheme=localStorage.getItem("fs.theme")||"light"; }catch(e){}
